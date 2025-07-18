@@ -1,5 +1,5 @@
 from EmulatorCore import register, Ram
-class hart():
+class riscv32():
   def __init__(self, ram):
     self.registers = [register(0, lock=True)]
     for i in range(31):
