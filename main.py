@@ -6,6 +6,7 @@ from CORE import NewScreen, SetCaption, CreateScrn, MainLoop,  Status, pygame, B
 screen = NewScreen((400, 400))
 SetCaption("Game")
 # TODO: Define how each screen should look and behave
+# This screen handles the 
 def DrawScreen0():
     pass
 def Screen0Events(event):

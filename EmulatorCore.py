@@ -1,4 +1,7 @@
 class register():
+  """
+    A register is a variable that can be used to store a value locked to a certain size. A register can be locked to prevent it from being changed. Registers can be compared to each other and can be used in arithmetic operations, but only if they are not locked, and only for asignment operations.
+  """
   def __init__(self, value=0, size=32, lock=False):
       self.value = value
       self.lock = lock
@@ -96,7 +99,9 @@ class register():
       return self.value
   def get(self):
       return self.value
-class ram():
+class Ram():
+  """
+    A ram is a block of memory that can be read from and written to. It is a byte array that wraps around. It is used to store data that is not in a register. Ram can be defined to any size, but it is recommended to use a size that is a power of 2."""
   def __init__(self, size):
       self.size = size
       self.memory = bytearray(size)
@@ -107,4 +112,12 @@ class ram():
         address-= self.size
       return self.memory[address]
   def write(self, address, value):
+      while address < 0:
+        address += self.size
+      while address >= self.size::
+        address-= self.size
+      while value < 0:
+        value += 256
+      while value >= 256:
+        value -= 256
       self.memory[address] = value
