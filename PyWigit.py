@@ -32,21 +32,34 @@ def NewFont(name, size):
 def SetCaption(caption):
     pygame.display.set_caption(caption)
 MultiScrn = []
-CurentScrn = 0
+Windows = []
+running = True
 def CreateScrn(DrawFunc, InputFunc, color):
     MultiScrn.append({"Draw":DrawFunc, "Input":InputFunc, "color":color})
-running = True
-def MainLoop(screen):
-    global running
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        else:
-            MultiScrn[CurentScrn]["Input"](event)
-    screen.fill(MultiScrn[CurentScrn]["color"])
-    MultiScrn[CurentScrn]["Draw"]()
-    pygame.display.flip()
-    clock.tick(60)
+class Screen():
+  def __init__(self, screen,x=0,y=0, size=(400, 400), FullScreen=False):
+    self.CurentScrn = 0
+    if FullScreen:
+      self.screen = screen
+      self.x = 0
+      self.y = 0
+    else:
+      self.screen = pygame.Surface(size)
+      self.x = x
+      self.y = y
+    Windows.append(self)
+  def MainLoop(self):
+    self.screen.fill(MultiScrn[self.CurentScrn]["color"])
+    MultiScrn[self.CurentScrn]["Draw"](self.screen)
+  def ChangeScrn(self, num):
+    self.CurentScrn = num
+  def Close(self):
+    if len(Windows) == 1:
+      global running
+      running = False
+    else:
+      Windows.remove(self)
+      del self
 def Status():
     return running
 Enter=13
@@ -57,3 +70,30 @@ Black = (0, 0, 0)
 Red = (255, 0, 0)
 Green = (0, 255, 0)
 Blue = (0, 0, 255)
+Yellow = (255, 255, 0)
+Cyan = (0, 255, 255)
+Magenta = (255, 0, 255)
+Gray = (128, 128, 128)
+LightGray = (192, 192, 192)
+DarkGray = (64, 64, 64)
+Orange = (255, 128, 0)
+Purple = (128, 0, 255)
+Pink = (255, 0, 128)
+Brown = (128, 64, 0)
+def MainLoop(screen):
+  global running
+  for event in pygame.event.get():
+      if event.type == pygame.QUIT:
+        running = False
+      else:
+        handled = False
+        for window in Windows:
+          handled = MultiScrn[window.CurentScrn]["Input"](event)
+          if handled:
+            break
+  screen.fill(Black)
+  for window in Windows:
+    window.MainLoop()
+    screen.blit(window.screen, (window.x, window.y))
+  pygame.display.flip()
+  clock.tick(60)

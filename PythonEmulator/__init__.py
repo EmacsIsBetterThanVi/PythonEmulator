@@ -1,1 +1,1 @@
-from EmulatorCore import * # pyright: ignore
+from .EmulatorCore import * # pyright: ignore
