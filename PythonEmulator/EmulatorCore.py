@@ -1,3 +1,17 @@
+def GrabBits(value, start, end):
+  if end < start:
+    return 0
+  return (value >> start) & ((2**(end-start+1))-1)
+def LittleEndian(values, size):
+  result = 0
+  for i in range(size):
+    result |= values[i] << (i*8)
+  return result
+def BigEndian(values, size):
+  result = 0
+  for i in range(size):
+    result |= values[i] << ((size-i-1)*8)
+  return result
 class register():
   """
     A register is a variable that can be used to store a value locked to a certain size. A register can be locked to prevent it from being changed. Registers can be compared to each other and can be used in arithmetic operations, but only if they are not locked, and only for asignment operations.
@@ -107,10 +121,12 @@ class register():
       while self.value > self.max:
           self.value -= self.max
       return self
-  def set(self, value):
+  def set(self, value, Bits=(0, -1)):
+      if (Bits[1] == -1):
+        Bits[1] = self.size-1
       if self.lock:
           return self
-      self.value = value
+      self.value = (value & GrabBits(self.max, Bits[0], Bits[1])) | ((GrabBits(self.max, Bits[1]+1, self.size-1) << Bits[1]+1) * GrabBits(self.value, Bits[1], Bits[1]))
       while self.value > self.max:
           self.value -= self.max
       while self.value < 0:
@@ -234,45 +250,73 @@ class register():
 class Ram():
   """
     A ram is a block of memory that can be read from and written to. It is a byte array that wraps around. It is used to store data that is not in a register. Ram can be defined to any size, but it is recommended to use a size that is a power of 2."""
-  def __init__(self, ram, locked=[]):
-      if isinstance(ram, bytearray):
-          self.memory = ram
-          self.size = len(ram)
+  def __init__(self, size, initram=None, locked=False):
+      if isinstance(initram, bytearray):
+        self.memory = initram
       else:
-        self.size = ram
-        self.memory = bytearray(ram)
+        self.memory = bytearray(size)
+      self.size = size
       self.locked = locked
+      self.adressLimit = size
+  def setAdressLimit(self, limit):
+    self.adressLimit = limit
+  def __getitem__(self, index):
+      return self.memory[index]
+  def __setitem__(self, index, value):
+      self.memory[index] = value
+  def wipe(self):
+      self.memory = bytearray(self.size)
   def read(self, address):
       while address < 0:
-        address += self.size
-      while address >= self.size:
-        address-= self.size
+        address += self.adressLimit
+      while address >= self.adressLimit:
+        address-= self.adressLimit
+      if address >= self.size:
+        return 0
       return self.memory[address]
   def write(self, address, value):
       while address < 0:
-        address += self.size
-      while address >= self.size:
-        address-= self.size
+        address += self.adressLimit
+      while address >= self.adressLimit:
+        address-= self.adressLimit
       while value < 0:
         value += 256
       while value >= 256:
         value -= 256
-      if not self.checkLocked(address):
+      if (not self.locked) and address<self.size:
         self.memory[address] = value
-  def checkLocked(self,address):
-    for i in self.locked:
-      if i[0] <= address <= i[1]:
-        return True
-    return False
-def GrabBits(value, start, end):
-  return (value >> start) & ((2**(end-start+1))-1)
-def LittleEndian(values, size):
-  result = 0
-  for i in range(size):
-    result |= values[i] << (i*8)
-  return result
-def BigEndian(values, size):
-  result = 0
-  for i in range(size):
-    result |= values[i] << ((size-i-1)*8)
-  return result
+class Memory():
+  def __init__(self, regions=[], addressLimit=0):
+    self.regions = regions
+    self.addressLimit = addressLimit
+    for region in self.regions:
+      if region[0] + region[1].size > self.addressLimit:
+        self.addressLimit = region[0] + region[1].size
+  def read(self, address):
+    while address > self.addressLimit:
+      address-= self.addressLimit
+    while address < 0:
+      address += self.addressLimit
+    for region in self.regions:
+      if region[0] <= address < region[1].size:
+        return region[1].read(address - region[0])
+    return 0
+  def write(self, address, value):
+    while address > self.addressLimit:
+      address-= self.addressLimit
+    while address < 0:
+      address += self.addressLimit
+    for region in self.regions:
+      if region[0] <= address < region[1].size:
+        region[1].write(address - region[0], value)
+        return
+  def setAddressLimit(self, limit):
+    self.addressLimit = limit
+  def mmio(self, address, object):
+    self.regions.append((object.mmio(address)))
+  def mmioHandle(self):
+    for region in self.regions:
+      if len(region) == 3:
+        region[2]()
+  def mm(self, address, object):
+    self.regions.append((address, object))
