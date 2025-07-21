@@ -25,8 +25,6 @@ class Console():
     for i in range(256):
       self.charmap[i] = image.subsurface(pygame.Rect((i%16)*8, (i//16)*16, 8, 16))
   def mmioHandle(self):
-    self.clear()
-    for i in range(self.buffer.size):
-      self.write(i, 0, self.buffer[i])
+    pass
   def mmio(self, address):
     return (address, self.buffer, self.mmioHandle)

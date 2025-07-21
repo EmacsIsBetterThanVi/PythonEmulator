@@ -21,6 +21,9 @@ def StartEmulator():
   if RomFile.value != "":
     ROM = bytearray(open(RomFile.value, "rb").read())
     ram.mm(0x0, Ram(0x10000, ROM, True))
+    #for i in ROM:
+    #  print(hex(i), end=" ")
+    #print()
   # Our emulator will be a riscv32 emulator, with 64kb of ram, and a console with 80x25 characters
   # Because riscv uses memory mapped io, here is the memory map:
   # 0x00000000 - 0x0000FFFF: Boot ROM
@@ -56,11 +59,18 @@ def Screen0Events(event):
 CreateScrn(DrawScreen0, Screen0Events, Black)
 # This screen handles the emulator
 def DrawScreen1(screen):
-  console.writeString(0, 0, hex(cpu.pc.value))
   console.draw(screen)
 def Screen1Events(event):
   if event.type == pygame.KEYDOWN:
-    keyboard.press(event.key)
+    if cpu.paused:
+      if event.key == 32:
+        x = int("0x"+input("Base Address: 0x"), 16)
+        for i in range(256):
+          print(f"{ram.read(x+i):02x}", end=(" " if (i+1)%16!=0 else "\n"))
+      elif event.key == 113:
+        EmulatorScreen.ChangeScrn(1)
+    else:
+      keyboard.press(event.key)
     return True
   return False
 def Screen1FastTick():
@@ -68,5 +78,5 @@ def Screen1FastTick():
   cpu.execute()
 CreateScrn(DrawScreen1, Screen1Events, Black, Screen1FastTick)
 while Status():
-  MainLoop(screen)
+  MainLoop(screen, Fast=(ram is not None))
 pygame.quit()

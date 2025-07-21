@@ -123,7 +123,7 @@ class register():
       return self
   def set(self, value, Bits=(0, -1)):
       if (Bits[1] == -1):
-        Bits[1] = self.size-1
+        Bits = (Bits[0], self.size-1)
       if self.lock:
           return self
       self.value = (value & GrabBits(self.max, Bits[0], Bits[1])) | ((GrabBits(self.max, Bits[1]+1, self.size-1) << Bits[1]+1) * GrabBits(self.value, Bits[1], Bits[1]))
@@ -246,7 +246,7 @@ class register():
   def get(self):
       return self.value
   def gets(self):
-      return -(GrabBits(self.value, 0, self.size-2)) if GrabBits(self.value, self.size-1, self.size-1) == 1 else self.value
+      return (self.value)-(self.max+1) if GrabBits(self.value, self.size-1, self.size-1) == 1 else self.value
 class Ram():
   """
     A ram is a block of memory that can be read from and written to. It is a byte array that wraps around. It is used to store data that is not in a register. Ram can be defined to any size, but it is recommended to use a size that is a power of 2."""
@@ -300,7 +300,7 @@ class Memory():
     while address < 0:
       address += self.addressLimit
     for region in self.regions:
-      if region[0] <= address < region[1].size:
+      if region[0] <= address < region[1].size+region[0]:
         return region[1].read(address - region[0])
     return 0
   def write(self, address, value):
@@ -309,7 +309,7 @@ class Memory():
     while address < 0:
       address += self.addressLimit
     for region in self.regions:
-      if region[0] <= address < region[1].size:
+      if region[0] <= address < region[1].size+region[0]:
         region[1].write(address - region[0], value)
         return
   def setAddressLimit(self, limit):

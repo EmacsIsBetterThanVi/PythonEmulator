@@ -26,7 +26,6 @@ class riscv32():
     byte3 = self.ram.read(self.pc.get()+2)
     byte4 = self.ram.read(self.pc.get()+3)
     instruction = LittleEndian([byte1, byte2, byte3, byte4], 4)
-    self.pc += 4
     opcode = GrabBits(instruction, 0, 6)
     rd = 0
     rs1 = 0
@@ -68,8 +67,9 @@ class riscv32():
       if self.paused:
         return
       opcode, rd, funct3, rs1, rs2, funct7, imm = self.decode()
-      imm = register(imm, 32)
-      print(opcode, rd, funct3, rs1, rs2, funct7,imm.get())
+      imm = register(imm)
+      #print(opcode, {0b0110011:"register math", 0b0010011:"Immedite math", 0b0000011:"Load", 0b0100011:"Store", 0b1100011:"Branch", 0b1101111:"Jal", 0b1100111:"Jalr", 0b0010111:"auipc", 0b0110111:"lui", 0b1110011:"call", 0b1111111:"break"}[opcode], "rd:", rd, "funct3:", funct3, "rs1:", rs1, "rs2:", rs2, "funct7:", funct7, "imm(U):", imm.get(), "imm:", imm.gets())
+      #self.paused = True
       if opcode == 0b0110011:
         if funct3 == 0x0:
           if funct7 == 0x0:
@@ -174,5 +174,8 @@ class riscv32():
     except Exception as e:
       print(e)
       for i in range(32):
-        print(f'{["zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2", "a3", "a4","a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10","s11", "t3", "t4", "t5", "t6"][i]}:{self.registers[i].value}', end=(", " if (i+1)%8!=0 else "\n"))
+        print(f'{["zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2", "a3", "a4","a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10","s11", "t3", "t4", "t5", "t6"][i]}:{hex(self.registers[i].value)}', end=(", " if (i+1)%8!=0 else "\n"))
+      print(f"PC:{hex(self.pc.get())}")
       self.paused = True
+    finally:
+      self.pc += 4
