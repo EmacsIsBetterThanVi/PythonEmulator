@@ -56,6 +56,7 @@ def Screen0Events(event):
 CreateScrn(DrawScreen0, Screen0Events, Black)
 # This screen handles the emulator
 def DrawScreen1(screen):
+  console.writeString(0, 0, hex(cpu.pc.value))
   console.draw(screen)
 def Screen1Events(event):
   if event.type == pygame.KEYDOWN:

@@ -126,6 +126,7 @@ class Button():
         self.rect = self.display.get_rect()
     def draw(self, screen, loc):
         self.rect = screen.blit(self.display, loc)
+        pygame.draw.rect(self.display, White, self.rect, 1)
     def Click(self, event):
       if event.type == pygame.MOUSEBUTTONDOWN:
         if self.rect.collidepoint(event.pos):
@@ -229,6 +230,8 @@ class FileChoser(Screen):
             if pygame.Rect(10, 100 + i * 30, 400, 30).collidepoint(event.pos):
               self.file = files[i]
               return True
+        if self.screen.get_rect().collidepoint(event.pos):
+          return True
     return False
   @staticmethod
   def Default():
@@ -243,7 +246,8 @@ def MainLoop(screen, Fast=False):
   global running
   for event in pygame.event.get():
       handled = False
-      for window in Windows:
+      for i in range(len(Windows)-1, -1, -1):
+        window = Windows[i]
         if MultiScrn[window.CurentScrn].get("Object"):
           handled = MultiScrn[window.CurentScrn]["Object"].Events(event)
         else:

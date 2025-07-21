@@ -251,10 +251,12 @@ class Ram():
   """
     A ram is a block of memory that can be read from and written to. It is a byte array that wraps around. It is used to store data that is not in a register. Ram can be defined to any size, but it is recommended to use a size that is a power of 2."""
   def __init__(self, size, initram=None, locked=False):
+      self.memory = bytearray(size)
       if isinstance(initram, bytearray):
-        self.memory = initram
-      else:
-        self.memory = bytearray(size)
+        for i in range(len(initram)):
+          if i >= size:
+            break
+          self.memory[i] = initram[i]
       self.size = size
       self.locked = locked
       self.adressLimit = size

@@ -1,6 +1,6 @@
 from .EmulatorCore import LittleEndian, register, Ram, GrabBits, Memory  
 class riscv32():
-  rtype = [0b0110011]
+  rtype = [0b0110011, 0b1111111]
   itype = [0b0010011, 0b0000011, 0b1100111, 0b1110011]
   stype = [0b0100011]
   btype = [0b1100011]
@@ -17,6 +17,7 @@ class riscv32():
       self.ram = ram
     else:
       self.ram = Ram(ram)
+    self.paused = False
     self.ram.setAddressLimit(2**32-1) # pyright: ignore
   # Decode the next instruction in memory, then increment the program counter by 4
   def decode(self):
@@ -63,103 +64,115 @@ class riscv32():
     return opcode, rd, funct3, rs1, rs2, funct7, imm
   # Execute the next instruction in memory
   def execute(self):
-    opcode, rd, funct3, rs1, rs2, funct7, imm = self.decode()
-    if opcode == 0b0110011:
-      if funct3 == 0x0:
-        if funct7 == 0x0:
-          self.registers[rd].set(self.registers[rs1].get() + self.registers[rs2].get()) # add
-        elif funct7 == 0x20:
-          self.registers[rd].set(self.registers[rs1].get() - self.registers[rs2].get()) # sub
-      elif funct3 == 0x1:
-        self.registers[rd].set(self.registers[rs1].get() << self.registers[rs2].get()) # sll
-      elif funct3 == 0x2:
-        self.registers[rd].set(1 if self.registers[rs1] < self.registers[rs2] else 0, (0, 0)) # slt
-      elif funct3 == 0x3:
-        self.registers[rd].set(1 if self.registers[rs1] < self.registers[rs2] else 0) # sltu
-      elif funct3 == 0x4:
-        self.registers[rd].set(self.registers[rs1].get() ^ self.registers[rs2].get()) # xor
-      elif funct3 == 0x5:
-        if funct7 == 0x0:
-          self.registers[rd].set(self.registers[rs1].get() >> self.registers[rs2].get()) # srl
-        elif funct7 == 0x20:
-          self.registers[rd].set(self.registers[rs1].gets() >> self.registers[rs2].get() | (GrabBits(0xFFFFFFFF, 32 - self.registers[rs2].get(), 31) << 32 - self.registers[rs2].get()) * GrabBits(self.registers[rs1], 31, 31)) # sra
-      elif funct3 == 0x6:
-        self.registers[rd].set(self.registers[rs1].get() | self.registers[rs2].get()) # or
-      elif funct3 == 0x7: # and
-        self.registers[rd].set(self.registers[rs1].get() & self.registers[rs2].get())
-    elif opcode == 0b0010011:
-      if funct3 == 0x0:
-        self.registers[rd].set(self.registers[rs1].get() + imm) # addi
-      elif funct3 == 0x1:
-        self.registers[rd].set(self.registers[rs1].get() << GrabBits(imm, 0, 4)) # slli
-      elif funct3 == 0x2:
-        self.registers[rd].set(1 if self.registers[rs1].gets() < imm else 0) # slti
-      elif funct3 == 0x3:
-        self.registers[rd].set(1 if self.registers[rs1] < imm else 0) # sltiu
-      elif funct3 == 0x4:
-        self.registers[rd].set(self.registers[rs1].get() ^ imm) # xori
-      elif funct3 == 0x5:
-        if GrabBits(imm, 5, 11) == 0x0:
-          self.registers[rd].set(self.registers[rs1].get() >> GrabBits(imm, 0, 4)) # srli
-        elif GrabBits(imm, 5, 11) == 0x20:
-          self.registers[rd].set(self.registers[rs1].gets() >> GrabBits(imm, 0, 4) | (GrabBits(0xFFFFFFFF, 32 - GrabBits(imm, 0, 4), 31) << 32 - GrabBits(imm, 0, 4)) * GrabBits(self.registers[rs1], 31, 31)) # srai
-      elif funct3 == 0x6:
-        self.registers[rd].set(self.registers[rs1].get() | imm) # ori
-      elif funct3 == 0x7: # andi
-        self.registers[rd].set(self.registers[rs1].get() & imm)
-    elif opcode == 0b0000011:
-      if funct3 == 0x0:
-        self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm), (0, 7)) # lb
-      elif funct3 == 0x1:
-        self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm) | (self.ram.read(self.registers[rs1].get() + imm + 1) << 8), (0, 15)) # lh
-      elif funct3 == 0x2:
-        self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm) | (self.ram.read(self.registers[rs1].get() + imm + 1) << 8) | (self.ram.read(self.registers[rs1].get() + imm + 2) << 16) | (self.ram.read(self.registers[rs1].get() + imm + 3) << 24)) # lw
-      elif funct3 == 0x4:
-        self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm)) # lbu
-      elif funct3 == 0x5:
-        self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm) | (self.ram.read(self.registers[rs1].get() + imm + 1) << 8)) # lhu
-    elif opcode == 0b0100011:
-      if funct3 == 0x0:
-        self.ram.write(self.registers[rs1].get() + imm, GrabBits(self.registers[rs2].get(), 0, 7)) # sb
-      elif funct3 == 0x1:
-        self.ram.write(self.registers[rs1].get() + imm, GrabBits(self.registers[rs2].get(), 0, 7)) # sh
-        self.ram.write(self.registers[rs1].get() + imm + 1, GrabBits(self.registers[rs2].get(), 8, 15)) # sh
-      elif funct3 == 0x2:
-        self.ram.write(self.registers[rs1].get() + imm, GrabBits(self.registers[rs2].get(), 0, 7)) # sw
-        self.ram.write(self.registers[rs1].get() + imm + 1, GrabBits(self.registers[rs2].get(), 8, 15)) # sw
-        self.ram.write(self.registers[rs1].get() + imm + 2, GrabBits(self.registers[rs2].get(), 16, 23)) # sw
-        self.ram.write(self.registers[rs1].get() + imm + 3, GrabBits(self.registers[rs2].get(), 24, 31)) # sw
-    elif opcode == 0b1100011:
-      if funct3 == 0x0:
-        if self.registers[rs1].get() == self.registers[rs2].get():
-          self.pc.set(self.pc.get() + imm) # beq
-      elif funct3 == 0x1:
-        if self.registers[rs1].get() != self.registers[rs2].get():
-          self.pc.set(self.pc.get() + imm) # bne
-      elif funct3 == 0x4:
-        if self.registers[rs1].gets() < self.registers[rs2].gets():
-          self.pc.set(self.pc.get() + imm) # blt
-      elif funct3 == 0x5:
-        if self.registers[rs1].gets() >= self.registers[rs2].gets():
-          self.pc.set(self.pc.get() + imm) # bge
-      elif funct3 == 0x6:
-        if self.registers[rs1].get() < self.registers[rs2].get():
-          self.pc.set(self.pc.get() + imm) # bltu
-      elif funct3 == 0x7:
-        if self.registers[rs1].get() >= self.registers[rs2].get():
-          self.pc.set(self.pc.get() + imm) # bgeu
-    elif opcode == 0b1101111:
-      self.registers[rd].set(self.pc.get())
-      self.pc.set(self.pc.get() + imm) # jal
-    elif opcode == 0b1100111:
-      self.registers[rd].set(self.pc.get())
-      self.pc.set(self.registers[rs1].get() + imm) # jalr
-    elif opcode == 0b0110111:
-      self.registers[rd].set(imm) # lui
-    elif opcode == 0b0010111:
-      self.registers[rd].set(self.pc.get()+imm) #auipc
-    elif opcode == 0b1110011: 
-      if imm == 0x0: # ecall
-        pass
-      elif imm == 0x1: # ebreak
-        pass
+    try:
+      if self.paused:
+        return
+      opcode, rd, funct3, rs1, rs2, funct7, imm = self.decode()
+      imm = register(imm, 32)
+      print(opcode, rd, funct3, rs1, rs2, funct7,imm.get())
+      if opcode == 0b0110011:
+        if funct3 == 0x0:
+          if funct7 == 0x0:
+            self.registers[rd].set(self.registers[rs1].get() + self.registers[rs2].get()) # add
+          elif funct7 == 0x20:
+            self.registers[rd].set(self.registers[rs1].get() - self.registers[rs2].get()) # sub
+        elif funct3 == 0x1:
+          self.registers[rd].set(self.registers[rs1].get() << self.registers[rs2].get()) # sll
+        elif funct3 == 0x2:
+          self.registers[rd].set(1 if self.registers[rs1] < self.registers[rs2] else 0, (0, 0)) # slt
+        elif funct3 == 0x3:
+          self.registers[rd].set(1 if self.registers[rs1] < self.registers[rs2] else 0) # sltu
+        elif funct3 == 0x4:
+          self.registers[rd].set(self.registers[rs1].get() ^ self.registers[rs2].get()) # xor
+        elif funct3 == 0x5:
+          if funct7 == 0x0:
+            self.registers[rd].set(self.registers[rs1].get() >> self.registers[rs2].get()) # srl
+          elif funct7 == 0x20:
+            self.registers[rd].set(self.registers[rs1].gets() >> self.registers[rs2].get() | (GrabBits(0xFFFFFFFF, 32 - self.registers[rs2].get(), 31) << 32 - self.registers[rs2].get()) * GrabBits(self.registers[rs1], 31, 31)) # sra
+        elif funct3 == 0x6:
+          self.registers[rd].set(self.registers[rs1].get() | self.registers[rs2].get()) # or
+        elif funct3 == 0x7: # and
+          self.registers[rd].set(self.registers[rs1].get() & self.registers[rs2].get())
+      elif opcode == 0b0010011:
+        if funct3 == 0x0:
+          self.registers[rd].set(self.registers[rs1].get() + imm.get()) # addi
+        elif funct3 == 0x1:
+          self.registers[rd].set(self.registers[rs1].get() << GrabBits(imm, 0, 4)) # slli
+        elif funct3 == 0x2:
+          self.registers[rd].set(1 if self.registers[rs1].gets() < imm else 0) # slti
+        elif funct3 == 0x3:
+          self.registers[rd].set(1 if self.registers[rs1] < imm else 0) # sltiu
+        elif funct3 == 0x4:
+          self.registers[rd].set(self.registers[rs1].get() ^ imm.get()) # xori
+        elif funct3 == 0x5:
+          if GrabBits(imm, 5, 11) == 0x0:
+            self.registers[rd].set(self.registers[rs1].get() >> GrabBits(imm, 0, 4)) # srli
+          elif GrabBits(imm, 5, 11) == 0x20:
+            self.registers[rd].set(self.registers[rs1].gets() >> GrabBits(imm, 0, 4) | (GrabBits(0xFFFFFFFF, 32 - GrabBits(imm, 0, 4), 31) << 32 - GrabBits(imm, 0, 4)) * GrabBits(self.registers[rs1], 31, 31)) # srai
+        elif funct3 == 0x6:
+          self.registers[rd].set(self.registers[rs1].get() | imm.get()) # ori
+        elif funct3 == 0x7: # andi
+          self.registers[rd].set(self.registers[rs1].get() & imm.get())
+      elif opcode == 0b0000011:
+        if funct3 == 0x0:
+          self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm.gets()), (0, 7)) # lb
+        elif funct3 == 0x1:
+          self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm.gets()) | (self.ram.read(self.registers[rs1].get() + imm.gets() + 1) << 8), (0, 15)) # lh
+        elif funct3 == 0x2:
+          self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm.gets()) | (self.ram.read(self.registers[rs1].get() + imm.gets()+ 1) << 8) | (self.ram.read(self.registers[rs1].get() + imm.gets() + 2) << 16) | (self.ram.read(self.registers[rs1].get() + imm.gets() + 3) << 24)) # lw
+        elif funct3 == 0x4:
+          self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm.gets())) # lbu
+        elif funct3 == 0x5:
+          self.registers[rd].set(self.ram.read(self.registers[rs1].get() + imm.gets()) | (self.ram.read(self.registers[rs1].get() + imm.gets() + 1) << 8)) # lhu
+      elif opcode == 0b0100011:
+        if funct3 == 0x0:
+          self.ram.write(self.registers[rs1].get() + imm.gets(), GrabBits(self.registers[rs2].get(), 0, 7)) # sb
+        elif funct3 == 0x1:
+          self.ram.write(self.registers[rs1].get() + imm.gets(), GrabBits(self.registers[rs2].get(), 0, 7)) # sh
+          self.ram.write(self.registers[rs1].get() + imm.gets() + 1, GrabBits(self.registers[rs2].get(), 8, 15)) # sh
+        elif funct3 == 0x2:
+          self.ram.write(self.registers[rs1].get() + imm.gets(), GrabBits(self.registers[rs2].get(), 0, 7)) # sw
+          self.ram.write(self.registers[rs1].get() + imm.gets() + 1, GrabBits(self.registers[rs2].get(), 8, 15)) # sw
+          self.ram.write(self.registers[rs1].get() + imm.gets() + 2, GrabBits(self.registers[rs2].get(), 16, 23)) # sw
+          self.ram.write(self.registers[rs1].get() + imm.gets() + 3, GrabBits(self.registers[rs2].get(), 24, 31)) # sw
+      elif opcode == 0b1100011:
+        if funct3 == 0x0:
+          if self.registers[rs1].get() == self.registers[rs2].get():
+            self.pc.set(self.pc.get() + imm.gets()) # beq
+        elif funct3 == 0x1:
+          if self.registers[rs1].get() != self.registers[rs2].get():
+            self.pc.set(self.pc.get() + imm.gets()) # bne
+        elif funct3 == 0x4:
+          if self.registers[rs1].gets() < self.registers[rs2].gets():
+            self.pc.set(self.pc.get() + imm.gets()) # blt
+        elif funct3 == 0x5:
+          if self.registers[rs1].gets() >= self.registers[rs2].gets():
+            self.pc.set(self.pc.get() + imm.gets()) # bge
+        elif funct3 == 0x6:
+          if self.registers[rs1].get() < self.registers[rs2].get():
+            self.pc.set(self.pc.get() + imm.gets()) # bltu
+        elif funct3 == 0x7:
+          if self.registers[rs1].get() >= self.registers[rs2].get():
+            self.pc.set(self.pc.get() + imm.gets()) # bgeu
+      elif opcode == 0b1101111:
+        self.registers[rd].set(self.pc.get())
+        self.pc.set(self.pc.get() + imm.gets()) # jal
+      elif opcode == 0b1100111:
+        self.registers[rd].set(self.pc.get())
+        self.pc.set(self.registers[rs1].get() + imm.get()) # jalr
+      elif opcode == 0b0110111:
+        self.registers[rd].set(imm.get()) # lui
+      elif opcode == 0b0010111:
+        self.registers[rd].set(self.pc.get()+imm.get()) #auipc
+      elif opcode == 0b1110011: 
+        if imm == 0x0: # ecall
+          pass
+        elif imm == 0x1: # ebreak
+          pass
+      elif opcode == 0b1111111: # break
+        raise Exception("Breakpoint reached")
+    except Exception as e:
+      print(e)
+      for i in range(32):
+        print(f'{["zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2", "a3", "a4","a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10","s11", "t3", "t4", "t5", "t6"][i]}:{self.registers[i].value}', end=(", " if (i+1)%8!=0 else "\n"))
+      self.paused = True
