@@ -1,5 +1,6 @@
 from .EmulatorCore import LittleEndian, register, Ram, GrabBits, Memory  
 class riscv32():
+  cps = 0
   rtype = [0b0110011, 0b1111111]
   itype = [0b0010011, 0b0000011, 0b1100111, 0b1110011]
   stype = [0b0100011]
@@ -198,3 +199,4 @@ class riscv32():
       self.pc += 4
       if self.step:
         self.paused = True
+      self.cps += 1

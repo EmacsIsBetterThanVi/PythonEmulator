@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 # Importing CORE, which previously was imported as using from CORE import *. This is because I am using replit and it complains about star imports. The first line is to prevent errors, while the second line is to silence the warnings.
 from PyWigit import * # pyright: ignore
 from PyWigit import NewScreen, SetCaption, CreateScrn, MainLoop, Screen, Status, pygame, Black, White, Button, NewFont, FileChoser, DropDown
@@ -5,6 +6,7 @@ from PythonEmulator import Ram, Memory, Serial
 from PythonEmulator.display import Console
 from PythonEmulator.input import Keyboard
 from PythonEmulator.riscv import riscv32
+import threading
 cpu: riscv32=None # pyright: ignore
 ram: Memory=None # pyright: ignore
 console: Console=None # pyright: ignore
@@ -61,6 +63,8 @@ def StartEmulator():
     Serial(keyboard, ram, 0x10000001)
   # Change the screen to the emulator screen, starting it
   EmulatorScreen.ChangeScrn(2)
+  global CPU
+  CPU = True
 screen = NewScreen((640, 400))
 EmulatorScreen = Screen(screen, FullScreen=True)
 SetCaption("Python Emulator")
@@ -83,8 +87,15 @@ def Screen0Events(event):
     return False
 CreateScrn(DrawScreen0, Screen0Events, Black)
 # This screen handles the emulator
+frames = 0
 def DrawScreen1(screen):
   console.draw(screen)
+  global frames
+  frames +=1
+  if frames == 60:
+    frames = 0
+    print(cpu.cps)
+    cpu.cps = 0
 def Screen1Events(event):
   if event.type == pygame.KEYDOWN:
     if cpu.paused:
@@ -93,6 +104,8 @@ def Screen1Events(event):
         for i in range(256):
           print(f"{ram.read(x+i):02x}", end=(" " if (i+1)%16!=0 else "\n"))
       elif event.key == 113:
+        global CPU
+        CPU = False
         EmulatorScreen.ChangeScrn(1)
       elif event.key == 115:
         cpu.step = not cpu.step
@@ -115,7 +128,18 @@ def Screen1FastTick():
   elif MemoryMap == "riscvqemu":
     pass
   cpu.execute()
-CreateScrn(DrawScreen1, Screen1Events, Black, Screen1FastTick)
+BREAK: bool = True
+CPU: bool = False
+def ThreadTest():
+  global BREAK, ram
+  while BREAK:
+    if CPU:
+      Screen1FastTick()
+CreateScrn(DrawScreen1, Screen1Events, Black)#, Screen1FastTick)
+t = threading.Thread(target=ThreadTest)
+t.start()
 while Status():
-  MainLoop(screen, Fast=(ram is not None))
+  MainLoop(screen)#, Fast=(ram is not None))
+BREAK = False
+t.join()
 pygame.quit()
