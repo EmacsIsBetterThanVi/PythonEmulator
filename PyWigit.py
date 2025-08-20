@@ -1,6 +1,7 @@
+from os import getcwd, environ
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "1"
 import pygame
 import glob
-from os import getcwd
 White = (255, 255, 255)
 Black = (0, 0, 0)
 Red = (255, 0, 0)
@@ -126,17 +127,19 @@ class Button():
         self.rect = self.display.get_rect()
     def draw(self, screen, loc):
         self.rect = screen.blit(self.display, loc)
-        pygame.draw.rect(self.display, White, self.rect, 1)
+        pygame.draw.rect(screen, White, self.rect, 1)
     def Click(self, event):
       if event.type == pygame.MOUSEBUTTONDOWN:
         if self.rect.collidepoint(event.pos):
           if event.button == 1 and self.LeftClick:
             self.LeftClick()
-          elif event.button == 2 and self.RightClick:
+            return True
+          elif event.button == 3 and self.RightClick:
             self.RightClick()
-          elif event.button == 3 and self.Mouse:
+            return True
+          elif event.button == 2 and self.Mouse:
             self.Mouse()
-          return True
+            return True
       return False
 class ImageButton(Button):
     def __init__(self, name, LeftClick=None, RightClick=None, Mouse=None):
@@ -144,6 +147,66 @@ class ImageButton(Button):
         self.LeftClick=LeftClick
         self.RightClick=RightClick
         self.Mouse=Mouse
+class ScrollArea():
+    def __init__(self, height, seperation, display=[]):
+        self.display = display
+        self.scroll = 0
+        self.seperation = seperation
+        self.height = height
+    def draw(self, screen, loc):
+        self.rect = pygame.Rect(loc[0], loc[1], self.height, self.seperation)
+        for i in range(self.scroll, self.scroll+self.height):
+            if i >= len(self.display):
+              break
+            self.display[i].draw(screen, (loc[0], loc[1]+(i-self.scroll)*self.seperation))
+    def Events(self, event):
+      if event.type == pygame.MOUSEBUTTONDOWN:
+        if self.rect.collidepoint(event.pos):
+          if event.button == 4:
+            self.scroll -= 1
+          elif event.button == 5:
+            self.scroll += 1
+          if self.scroll < 0:
+            self.scroll = 0
+          if self.scroll >= len(self.display)+self.height:
+            self.scroll = len(self.display)
+class DropDown():
+    def __init__(self, options, optionvalues, font, default=0, color=White):
+        self.options = options
+        self.optionvalues = optionvalues
+        self.font = font
+        self.current = Pointer(default)
+        self.color = color
+        self.scroll = ScrollArea(5, self.font.get_height())
+        self.open = False
+    def draw(self, screen, loc):
+        self.rect = screen.blit(self.font.render(self.options[self.current.value], True, self.color), loc)
+        pygame.draw.rect(screen, self.color, self.rect, 1)
+        if self.open:
+          self.scroll.draw(screen, (loc[0], loc[1]+self.font.get_height()))
+    def Click(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+          if self.rect.collidepoint(event.pos):
+            if event.button == 1:
+              self.open = not self.open
+              if self.open:
+                self.buttons = []
+                for i in range(0, len(self.options)):
+                  self.buttons.append(Button(self.font.render(self.options[i], True, self.color),LeftClick=lambda a=self.current, b=i: a.__setattr__('value', b)))
+                self.scroll.display = self.buttons
+              return True 
+        if self.open:
+          a = self.scroll.Events(event)
+          if a:
+            return True
+          for i in self.buttons:
+            a = i.Click(event)
+            if a:
+              self.open = False
+              return True
+        return False
+    def get(self): 
+        return self.optionvalues[self.current.value]
 def NewScreen(size):
     return pygame.display.set_mode(size)
 def NewFont(name, size):
@@ -219,9 +282,11 @@ class FileChoser(Screen):
         self.scroll -= 1
       elif event.button == 5:
         self.scroll += 1
+      if self.scroll<0:
+         scroll = 0
       elif event.button == 1:
         files = glob.glob(self.path + "/" + self.filetypes)
-        if self.closeButton.Click(event):
+        if self.closeButton.rect.collidepoint(event.pos):
           self.returnv.value = self.file
           self.Close()
           return True

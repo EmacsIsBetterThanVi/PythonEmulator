@@ -322,3 +322,33 @@ class Memory():
         region[2]()
   def mm(self, address, object):
     self.regions.append((address, object))
+def Serial(object, ram, address):
+  try:
+    a = object.getSerialWrapper()
+    for i in range(len(ram.regions)):
+      if ram.regions[i][0] == address:
+        ram.regions.pop(i)
+    ram.regions.append(a.connect(address))
+  except:
+    print(f"{type(object)} does not support being bound to a serial port.")
+class SerialBase():
+  def __init__(self, objectRam, mmio, commands = {}):
+    self.mmio = mmio
+    self.objectRam = objectRam
+    self.pointer = 0
+    self.data = Ram(1)
+    self.oldData = 0
+    self.commands = commands
+  def mmioHandle(self):
+    if self.data[0] != self.oldData and self.data != 0:
+      if self.data in commands.keys():
+        self.commands()
+      else:
+        self.objectRam[self.pointer] = self.data[0]
+      self.pointer += 1 
+      self.mmio()
+      if self.pointer == self.objectRam.size:
+        self.pointer = 0
+      self.oldData=self.data[0]
+  def connect(self,address):
+    return (address,self.data,self.mmioHandle)

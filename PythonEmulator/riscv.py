@@ -6,20 +6,33 @@ class riscv32():
   btype = [0b1100011]
   utype = [0b0110111, 0b0010111]
   jtype = [0b1101111]
-  def __init__(self, ram):
+  def __init__(self, ram, start=0):
     self.registers = [register(0, lock=True)]
     for i in range(31):
         self.registers.append(register())
-    self.pc = register()
+    self.pc = register(start)
     if isinstance(ram, Ram):
       self.ram = ram
     elif isinstance(ram, Memory):
       self.ram = ram
     else:
       self.ram = Ram(ram)
+    self.ecall = 0
+    self.ebreak = 0
     self.paused = False
+    self.step = False
     self.ram.setAddressLimit(2**32-1) # pyright: ignore
   # Decode the next instruction in memory, then increment the program counter by 4
+  def reset(self):
+    self.registers = [register(0, lock=True)]
+    for i in range(31):
+        self.registers.append(register())
+    self.pc = register()
+  def ramregister(self, address, register):
+    if register == "ecall":
+      self.ecall = (self.ram.read(address) << 24) | (self.ram.read(address) << 16) | (self.ram.read(address) << 8) | self.ram.read(address)
+    elif register == "ebreak":
+      self.ebreak = (self.ram.read(address) << 24) | (self.ram.read(address) << 16) | (self.ram.read(address) << 8) | self.ram.read(address)
   def decode(self):
     byte1 = self.ram.read(self.pc.get())
     byte2 = self.ram.read(self.pc.get()+1)
@@ -166,11 +179,15 @@ class riscv32():
         self.registers[rd].set(self.pc.get()+imm.get()) #auipc
       elif opcode == 0b1110011: 
         if imm == 0x0: # ecall
-          pass
+          self.registers[10].set(self.pc.get())
+          ECALLBASE = self.ecall+(4*self.registers[17].get())
+          self.pc.set((self.ram.read(ECALLBASE) << 24) | (self.ram.read(ECALLBASE+1) << 16) | (self.ram.read(ECALLBASE+2) << 8) | self.ram.read(ECALLBASE+3))
         elif imm == 0x1: # ebreak
-          pass
-      elif opcode == 0b1111111: # break
-        raise Exception("Breakpoint reached")
+          if self.ebreak != 0:
+            self.registers[10].set(self.pc.get())
+            self.pc.set(self.ebreak.value)
+          else:
+            raise Exception("Breakpoint reached")
     except Exception as e:
       print(e)
       for i in range(32):
@@ -179,3 +196,5 @@ class riscv32():
       self.paused = True
     finally:
       self.pc += 4
+      if self.step:
+        self.paused = True

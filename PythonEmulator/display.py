@@ -1,6 +1,6 @@
 import pygame
 import os
-from PythonEmulator.EmulatorCore import Ram
+from PythonEmulator.EmulatorCore import Ram, SerialBase
 class Console():
   def __init__(self, width, height):
     self.width = width
@@ -28,3 +28,5 @@ class Console():
     pass
   def mmio(self, address):
     return (address, self.buffer, self.mmioHandle)
+  def getSerialWrapper(self):
+    return SerialBase(self.buffer,self.mmioHandle, {12:self.clear})
