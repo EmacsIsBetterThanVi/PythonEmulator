@@ -77,6 +77,7 @@ class riscv32():
     return opcode, rd, funct3, rs1, rs2, funct7, imm
   # Execute the next instruction in memory
   def execute(self):
+    # TODO: add m, a, Zifencei and Zicsr extentions. Also Su?
     try:
       if self.paused:
         return
